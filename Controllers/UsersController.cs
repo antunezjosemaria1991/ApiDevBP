@@ -1,52 +1,80 @@
-using ApiDevBP.Entities;
 using ApiDevBP.Models;
+using ApiDevBP.Services;
 using Microsoft.AspNetCore.Mvc;
-using SQLite;
-using System.Reflection;
 
 namespace ApiDevBP.Controllers
 {
-    [ApiController]
-    [Route("[controller]")]
-    public class UsersController : ControllerBase
-    {
-        private readonly  SQLiteConnection _db;
-        
-        private readonly ILogger<UsersController> _logger;
+	[ApiController]
+	[Route("[controller]")]
+	public class UsersController : ControllerBase
+	{
+		private readonly IUserService _userService;
+		private readonly ILogger<UsersController> _logger;
 
-        public UsersController(ILogger<UsersController> logger)
-        {
-            _logger = logger;
-            string localDb = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "localDb");
-            _db = new SQLiteConnection(localDb);
-            _db.CreateTable<UserEntity>();
-        }
+		public UsersController(IUserService userService, ILogger<UsersController> logger)
+		{
+			_userService = userService;
+			_logger = logger;
+		}
 
-        [HttpPost]
-        public async Task<IActionResult> SaveUser(UserModel user)
-        {
-            var result = _db.Insert(new UserEntity()
-            {
-                Name = user.Name,
-                Lastname = user.Lastname
-            });
-            return Ok(result > 0);
-        }
+		// Get all users (GET)
+		[HttpGet]
+		public async Task<IActionResult> GetUsers()
+		{
+			var users = await _userService.GetAllUsersAsync();
+			if (users == null || !users.Any())
+			{
+				return NotFound("No users found.");
+			}
+			return Ok(users);
+		}
 
-        [HttpGet]
-        public async Task<IActionResult> GetUsers()
-        {
-            var users = _db.Query<UserEntity>($"Select * from Users");
-            if (users != null)
-            {
-                return Ok(users.Select(x=> new UserModel()
-                {
-                    Name = x.Name,
-                    Lastname = x.Lastname
-                }));
-            }
-            return NotFound();
-        }
+		// Get a single user by ID (GET)
+		[HttpGet("{id:int}")]
+		public async Task<IActionResult> GetUserById(int id)
+		{
+			var user = await _userService.GetUserByIdAsync(id);
+			if (user == null)
+			{
+				return NotFound("User not found.");
+			}
+			return Ok(user);
+		}
 
-    }
+		// Create a new user (POST)
+		[HttpPost]
+		public async Task<IActionResult> SaveUser(UserModel userModel)
+		{
+			var result = await _userService.CreateUserAsync(userModel);
+			if (!result)
+			{
+				return StatusCode(500, "An error occurred while creating the user.");
+			}
+			return Ok("User created successfully.");
+		}
+
+		// Update a user (PUT)
+		[HttpPut("{id:int}")]
+		public async Task<IActionResult> UpdateUser(int id, UserModel userModel)
+		{
+			var result = await _userService.UpdateUserAsync(id, userModel);
+			if (!result)
+			{
+				return StatusCode(500, "An error occurred while updating the user.");
+			}
+			return Ok("User updated successfully.");
+		}
+
+		// Delete a user (DELETE)
+		[HttpDelete("{id:int}")]
+		public async Task<IActionResult> DeleteUser(int id)
+		{
+			var result = await _userService.DeleteUserAsync(id);
+			if (!result)
+			{
+				return StatusCode(500, "An error occurred while deleting the user.");
+			}
+			return Ok("User deleted successfully.");
+		}
+	}
 }
